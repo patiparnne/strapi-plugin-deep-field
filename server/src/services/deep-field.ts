@@ -418,6 +418,40 @@ async function extractValue(
       return { value: null, found: false, error: `Path segment '${segment.name}' not found` };
     }
 
+    // Handle repeatable component/dynamic zone arrays: when current is an array
+    // (from a repeatable component), map remaining path over each element
+    if (Array.isArray(current) && isRepeatable) {
+      // Build the remaining path from this segment onwards
+      const remainingSegments = segments.slice(i);
+      const remainingPath = remainingSegments.map(s =>
+        s.componentUid ? `${s.name}[${s.componentUid}]` : s.name
+      ).join('.');
+
+      // Extract value from each array element
+      const results: any[] = [];
+      for (const element of current) {
+        if (!element || typeof element !== 'object') continue;
+        const subResult = await extractValue(strapi, element, remainingPath, componentUid || collectionUid, options);
+        if (subResult.found) {
+          // Flatten nested arrays from further repeatable components
+          if (Array.isArray(subResult.value) && subResult.isRepeatable) {
+            results.push(...subResult.value);
+          } else {
+            results.push(subResult.value);
+          }
+        }
+      }
+
+      return {
+        value: results,
+        found: results.length > 0,
+        type: fieldType,
+        source,
+        componentUid,
+        isRepeatable: true,
+      };
+    }
+
     // Get the attribute from schema
     const attr = currentSchema?.attributes?.[segment.name];
     
