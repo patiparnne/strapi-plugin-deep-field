@@ -186,6 +186,7 @@ async function traverseSchema(
   const types = options.types ?? DEFAULT_BASIC_TYPES;
   const includeRepeatable = options.includeRepeatable ?? true;
   const includeRelations = options.includeRelations ?? true;
+  const includeBuiltIn = options.includeBuiltIn ?? false;
 
   if (depth > maxDepth) {
     return fields;
@@ -195,9 +196,11 @@ async function traverseSchema(
     const path = parentPath ? `${parentPath}.${name}` : name;
     const attrType = attr.type as string;
     
-    // Skip internal fields
+    // Skip internal fields (unless includeBuiltIn is set at top-level depth)
     if (['id', 'createdAt', 'updatedAt', 'createdBy', 'updatedBy', 'publishedAt', 'locale'].includes(name)) {
-      continue;
+      if (!includeBuiltIn || depth > 0) {
+        continue;
+      }
     }
 
     // Get the label for this field from configuration
@@ -731,6 +734,42 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       0,  // depth
       'attribute' // source
     );
+
+    // Inject Strapi built-in fields when requested
+    if (options.includeBuiltIn) {
+      const builtInDefs: { name: string; type: BasicFieldType; label: string; relationTarget?: string }[] = [
+        { name: 'documentId', type: 'string', label: 'Document ID' },
+        { name: 'createdAt', type: 'datetime', label: 'Created At' },
+        { name: 'updatedAt', type: 'datetime', label: 'Updated At' },
+        { name: 'publishedAt', type: 'datetime', label: 'Published At' },
+        { name: 'locale', type: 'string', label: 'Locale' },
+        { name: 'createdBy', type: 'relation', label: 'Created By', relationTarget: 'admin::user' },
+        { name: 'updatedBy', type: 'relation', label: 'Updated By', relationTarget: 'admin::user' },
+      ];
+
+      const types = options.types ?? DEFAULT_BASIC_TYPES;
+      const includeRelations = options.includeRelations ?? true;
+
+      for (const def of builtInDefs) {
+        // Respect type filters
+        if (!types.includes(def.type)) continue;
+        if (def.type === 'relation' && !includeRelations) continue;
+        // Skip if traverseSchema already picked it up from attributes
+        if (fields.some(f => f.path === def.name)) continue;
+
+        const field: MappableField = {
+          path: def.name,
+          label: def.label,
+          type: def.type,
+          source: 'attribute',
+          required: false,
+        };
+        if (def.relationTarget) {
+          field.relationTarget = def.relationTarget;
+        }
+        fields.push(field);
+      }
+    }
 
     // Sort by path for consistent ordering
     return fields.sort((a, b) => a.path.localeCompare(b.path));

@@ -110,6 +110,13 @@ export interface ListFieldsOptions {
    * Default: true
    */
   includeRelations?: boolean;
+
+  /**
+   * Whether to include Strapi built-in fields (createdAt, updatedAt,
+   * publishedAt, locale, createdBy, updatedBy, documentId).
+   * Default: false
+   */
+  includeBuiltIn?: boolean;
   
   /**
    * Filter by specific component categories

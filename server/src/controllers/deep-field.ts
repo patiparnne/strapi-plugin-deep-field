@@ -47,6 +47,11 @@ export default ({ strapi }: { strapi: Core.Strapi }) => ({
       options.componentCategories = Array.isArray(componentCategories) ? componentCategories : componentCategories.split(',');
     }
 
+    const { includeBuiltIn } = ctx.query;
+    if (includeBuiltIn !== undefined) {
+      options.includeBuiltIn = includeBuiltIn === 'true' || includeBuiltIn === true;
+    }
+
     try {
       const service = strapi.plugin('deep-field').service('deep-field');
       const fields = await service.listFields(collectionUid, options);
